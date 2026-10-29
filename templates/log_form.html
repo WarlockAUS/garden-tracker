@@ -1,41 +1,41 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Add Log Entry</h2>
+<h2>{{ 'Edit Log Entry' if edit_mode else 'Add Log Entry' }}</h2>
 <form method="POST">
     <label for="plant_id">Plant</label>
     <select id="plant_id" name="plant_id" required>
         {% for p in plants %}
-        <option value="{{ p.id }}">{{ p.name }}{% if p.plant_type %} ({{ p.plant_type }}){% endif %}</option>
+        <option value="{{ p.id }}" {% if entry and entry.plant_id == p.id %}selected{% endif %}>{{ p.name }}{% if p.catalog_name %} ({{ p.catalog_name }}){% endif %}</option>
         {% endfor %}
     </select>
 
     <label for="entry_date">Date</label>
-    <input type="date" id="entry_date" name="entry_date" value="{{ today }}" required>
+    <input type="date" id="entry_date" name="entry_date" value="{{ entry.entry_date if entry else today }}" required>
 
     <label for="action_type">Action Type</label>
     <select id="action_type" name="action_type" required>
         {% for a in action_types %}
-        <option value="{{ a }}">{{ a }}</option>
+        <option value="{{ a }}" {% if entry and entry.action_type == a %}selected{% endif %}>{{ a }}</option>
         {% endfor %}
     </select>
 
     <label for="quantity">Quantity</label>
-    <input type="number" step="0.1" id="quantity" name="quantity">
+    <input type="number" step="0.1" id="quantity" name="quantity" value="{{ entry.quantity if entry and entry.quantity is not none else '' }}">
 
     <label for="unit">Unit</label>
     <select id="unit" name="unit">
         <option value=""></option>
         {% for u in units %}
-        <option value="{{ u }}">{{ u }}</option>
+        <option value="{{ u }}" {% if entry and entry.unit == u %}selected{% endif %}>{{ u }}</option>
         {% endfor %}
     </select>
 
     <label for="soil_ph">Soil pH (optional)</label>
-    <input type="number" step="0.1" id="soil_ph" name="soil_ph">
+    <input type="number" step="0.1" id="soil_ph" name="soil_ph" value="{{ entry.soil_ph if entry and entry.soil_ph is not none else '' }}">
 
     <label for="notes">Notes / Plant Response</label>
-    <textarea id="notes" name="notes" rows="4"></textarea>
+    <textarea id="notes" name="notes" rows="4">{{ entry.notes if entry else '' }}</textarea>
 
-    <button type="submit">Save Entry</button>
+    <button type="submit">{{ 'Save Changes' if edit_mode else 'Save Entry' }}</button>
 </form>
 {% endblock %}
