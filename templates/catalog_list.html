@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Plant Catalog</h2>
+<p>Reference guide for each plant type: feeding ratios, dosing rules, seasonal schedule, and deficiency guide.</p>
+<table>
+    <tr>
+        <th>Plant Type</th>
+        <th></th>
+    </tr>
+    {% for c in catalog %}
+    <tr>
+        <td>{{ c.name }}</td>
+        <td><a href="{{ url_for('catalog_detail', catalog_id=c.id) }}">View Guide</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="2">No catalog entries yet.</td></tr>
+    {% endfor %}
+</table>
+{% endblock %}
