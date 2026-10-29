@@ -2,6 +2,13 @@
 {% block content %}
 <h2>Add Log Entry</h2>
 <form method="POST">
+    <label for="plant_id">Plant</label>
+    <select id="plant_id" name="plant_id" required>
+        {% for p in plants %}
+        <option value="{{ p.id }}">{{ p.name }}{% if p.plant_type %} ({{ p.plant_type }}){% endif %}</option>
+        {% endfor %}
+    </select>
+
     <label for="entry_date">Date</label>
     <input type="date" id="entry_date" name="entry_date" value="{{ today }}" required>
 
