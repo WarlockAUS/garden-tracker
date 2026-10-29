@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Fertiliser Mix Calculator</h2>
+<p>Pick a plant, choose which ingredient supplies each nutrient, and set your batch size.</p>
+
+{% if error %}
+<p style="color:#a13d3d; font-weight:bold;">{{ error }}</p>
+{% endif %}
+
+<form method="POST">
+    <label for="plant_id">Plant</label>
+    <select id="plant_id" name="plant_id" required>
+        <option value="">-- Select a plant --</option>
+        {% for p in plants %}
+        <option value="{{ p.id }}" {% if selected_plant_id and selected_plant_id|int == p.id %}selected{% endif %}>
+            {{ p.name }}{% if p.catalog_name %} ({{ p.catalog_name }}{% if p.npk_n is not none %} - {{ p.npk_n|int }}:{{ p.npk_p|int }}:{{ p.npk_k|int }}{% endif %}){% endif %}
+        </option>
+        {% endfor %}
+    </select>
+
+    <label for="ingredient_n">Nitrogen (N) source</label>
+    <select id="ingredient_n" name="ingredient_n" required>
+        <option value="">-- Select ingredient --</option>
+        {% for i in ingredients %}
+        <option value="{{ i.id }}" {% if selected_n_id and selected_n_id|int == i.id %}selected{% endif %}>{{ i.name }} ({{ i.n_pct }}% N)</option>
+        {% endfor %}
+    </select>
+
+    <label for="ingredient_p">Phosphorus (P) source</label>
+    <select id="ingredient_p" name="ingredient_p" required>
+        <option value="">-- Select ingredient --</option>
+        {% for i in ingredients %}
+        <option value="{{ i.id }}" {% if selected_p_id and selected_p_id|int == i.id %}selected{% endif %}>{{ i.name }} ({{ i.p_pct }}% P2O5)</option>
+        {% endfor %}
+    </select>
+
+    <label for="ingredient_k">Potassium (K) source</label>
+    <select id="ingredient_k" name="ingredient_k" required>
+        <option value="">-- Select ingredient --</option>
+        {% for i in ingredients %}
+        <option value="{{ i.id }}" {% if selected_k_id and selected_k_id|int == i.id %}selected{% endif %}>{{ i.name }} ({{ i.k_pct }}% K2O)</option>
+        {% endfor %}
+    </select>
+
+    <label for="batch_size">Batch Size (grams)</label>
+    <input type="number" id="batch_size" name="batch_size" value="{{ batch_size }}" required>
+
+    <button type="submit">Calculate Mix</button>
+</form>
+
+{% if result %}
+<div class="result-box">
+    <h3>Recipe for this batch</h3>
+    <table>
+        <tr><th>Ingredient Role</th><th>Weight (g)</th></tr>
+        <tr><td>Nitrogen source</td><td>{{ result.w_n }} g</td></tr>
+        <tr><td>Phosphorus source</td><td>{{ result.w_p }} g</td></tr>
+        <tr><td>Potassium source</td><td>{{ result.w_k }} g</td></tr>
+        <tr><td><strong>Total</strong></td><td><strong>{{ result.total }} g</strong></td></tr>
+    </table>
+
+    <h3 style="margin-top:20px;">Resulting blend analysis</h3>
+    <table>
+        <tr><th>Nutrient</th><th>% of blend</th></tr>
+        <tr><td>Nitrogen (N)</td><td>{{ result.result_n_pct }}%</td></tr>
+        <tr><td>Phosphorus (P2O5)</td><td>{{ result.result_p_pct }}%</td></tr>
+        <tr><td>Potassium (K2O)</td><td>{{ result.result_k_pct }}%</td></tr>
+    </table>
+
+    <h3 style="margin-top:20px;">Secondary nutrients (informational only)</h3>
+    <table>
+        <tr><th>Nutrient</th><th>Total in batch</th></tr>
+        {% for label, value in result.secondary.items() %}
+        <tr><td>{{ label }}</td><td>{{ value }} g</td></tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+{% endblock %}
