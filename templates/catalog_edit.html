@@ -8,7 +8,14 @@
     <label for="feed_frequency_days">Feed Frequency (days)</label>
     <input type="number" id="feed_frequency_days" name="feed_frequency_days" value="{{ entry.feed_frequency_days if entry.feed_frequency_days is not none else '' }}">
 
-    <label for="npk_ratio">NPK Ratio & Blend</label>
+    <label>Target NPK Ratio</label>
+    <div style="display:flex; gap:8px;">
+        <input type="number" step="0.1" name="npk_n" value="{{ entry.npk_n if entry.npk_n is not none else '' }}" placeholder="N">
+        <input type="number" step="0.1" name="npk_p" value="{{ entry.npk_p if entry.npk_p is not none else '' }}" placeholder="P">
+        <input type="number" step="0.1" name="npk_k" value="{{ entry.npk_k if entry.npk_k is not none else '' }}" placeholder="K">
+    </div>
+
+    <label for="npk_ratio">NPK Ratio & Blend (reference text)</label>
     <textarea id="npk_ratio" name="npk_ratio" rows="4">{{ entry.npk_ratio or '' }}</textarea>
 
     <label for="dosing_rules">Dosing Rules</label>
