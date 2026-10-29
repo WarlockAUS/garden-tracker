@@ -19,6 +19,8 @@
         button:hover { background: #244029; }
         .delete-btn { background: #a13d3d; padding: 4px 10px; font-size: 12px; }
         .delete-btn:hover { background: #7e2f2f; }
+        .filter-bar { margin-bottom: 15px; background: white; padding: 10px 15px; border-radius: 6px; display: inline-block; }
+        .filter-bar select { display: inline; width: auto; margin-left: 8px; }
     </style>
 </head>
 <body>
@@ -26,6 +28,7 @@
     <nav>
         <a href="{{ url_for('log_list') }}">View Log</a>
         <a href="{{ url_for('add_entry') }}">Add Entry</a>
+        <a href="{{ url_for('manage_plants') }}">Manage Plants</a>
     </nav>
     {% block content %}{% endblock %}
 </body>
