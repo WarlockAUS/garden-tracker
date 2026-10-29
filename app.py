@@ -18,7 +18,10 @@ ACTION_TYPES = [
 UNITS = ["grams", "handfuls", "litres", "barrow loads"]
 
 CATALOG_FIELDS = ["name", "npk_ratio", "dosing_rules", "seasonal_notes", "deficiency_guide", "mulch_notes"]
-CATALOG_FIELDS_WITH_FREQ = CATALOG_FIELDS + ["feed_frequency_days"]
+CATALOG_EXTRA_FIELDS = ["feed_frequency_days", "npk_n", "npk_p", "npk_k"]
+CATALOG_FIELDS_WITH_FREQ = CATALOG_FIELDS + CATALOG_EXTRA_FIELDS
+
+INGREDIENT_FIELDS = ["name", "n_pct", "p_pct", "k_pct", "ca_pct", "mg_pct", "s_pct"]
 
 BANANA_CATALOG_ENTRY = {
     "name": "Banana",
@@ -28,6 +31,9 @@ BANANA_CATALOG_ENTRY = {
     "deficiency_guide": "Yellowing between veins, veins stay green: Magnesium deficiency.\nGeneral pale yellowing, slow growth: Nitrogen deficiency.\nDark green leaves, weak stems, poor bunch fill: Potassium deficiency.\nBrown scorched leaf margins, wilting: Over-fertilising.\nPurplish/reddish leaf tinge: Phosphorus deficiency.",
     "mulch_notes": "Depth: approx 10cm organic mulch. Keep clear of stems.\nSequence: pull mulch back, apply fertiliser, water in, replace mulch.\nTop up every 2-3 months.\nSucker thinning: keep main stem plus 1-2 followers, remove extras while small.",
     "feed_frequency_days": 42,
+    "npk_n": 3,
+    "npk_p": 1,
+    "npk_k": 6,
 }
 
 
@@ -75,6 +81,19 @@ def init_db():
         )
     """)
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS fertiliser_ingredients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            n_pct REAL,
+            p_pct REAL,
+            k_pct REAL,
+            ca_pct REAL,
+            mg_pct REAL,
+            s_pct REAL
+        )
+    """)
+
     plant_columns = [row[1] for row in conn.execute("PRAGMA table_info(plants)")]
     if "catalog_id" not in plant_columns:
         conn.execute("ALTER TABLE plants ADD COLUMN catalog_id INTEGER")
@@ -86,13 +105,23 @@ def init_db():
     catalog_columns = [row[1] for row in conn.execute("PRAGMA table_info(plant_catalog)")]
     if "feed_frequency_days" not in catalog_columns:
         conn.execute("ALTER TABLE plant_catalog ADD COLUMN feed_frequency_days INTEGER")
+    if "npk_n" not in catalog_columns:
+        conn.execute("ALTER TABLE plant_catalog ADD COLUMN npk_n REAL")
+    if "npk_p" not in catalog_columns:
+        conn.execute("ALTER TABLE plant_catalog ADD COLUMN npk_p REAL")
+    if "npk_k" not in catalog_columns:
+        conn.execute("ALTER TABLE plant_catalog ADD COLUMN npk_k REAL")
 
     existing = conn.execute(
         "SELECT id FROM plant_catalog WHERE name = ?", (BANANA_CATALOG_ENTRY["name"],)
     ).fetchone()
     if not existing:
         conn.execute(
-            "INSERT INTO plant_catalog (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            """
+            INSERT INTO plant_catalog
+            (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days, npk_n, npk_p, npk_k)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
             tuple(BANANA_CATALOG_ENTRY[f] for f in CATALOG_FIELDS_WITH_FREQ),
         )
         banana_catalog_id = conn.execute(
@@ -103,6 +132,10 @@ def init_db():
         conn.execute(
             "UPDATE plant_catalog SET feed_frequency_days = ? WHERE id = ? AND feed_frequency_days IS NULL",
             (BANANA_CATALOG_ENTRY["feed_frequency_days"], banana_catalog_id),
+        )
+        conn.execute(
+            "UPDATE plant_catalog SET npk_n=?, npk_p=?, npk_k=? WHERE id=? AND npk_n IS NULL",
+            (BANANA_CATALOG_ENTRY["npk_n"], BANANA_CATALOG_ENTRY["npk_p"], BANANA_CATALOG_ENTRY["npk_k"], banana_catalog_id),
         )
 
     count = conn.execute("SELECT COUNT(*) FROM plants").fetchone()[0]
@@ -116,6 +149,18 @@ def init_db():
         "UPDATE plants SET catalog_id = ? WHERE plant_type = 'Banana' AND catalog_id IS NULL",
         (banana_catalog_id,),
     )
+
+    # Seed a couple of common ingredients if none exist yet
+    ing_count = conn.execute("SELECT COUNT(*) FROM fertiliser_ingredients").fetchone()[0]
+    if ing_count == 0:
+        conn.executemany(
+            "INSERT INTO fertiliser_ingredients (name, n_pct, p_pct, k_pct, ca_pct, mg_pct, s_pct) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [
+                ("Sulphate of Ammonia", 21, 0, 0, 0, 0, 24),
+                ("Superphosphate", 0, 9.1, 0, 0, 0, 0),
+                ("Sulphate of Potash", 0, 0, 41.5, 0, 0, 17),
+            ],
+        )
 
     conn.commit()
     conn.close()
@@ -137,6 +182,13 @@ def get_catalog():
     catalog = conn.execute("SELECT * FROM plant_catalog ORDER BY name").fetchall()
     conn.close()
     return catalog
+
+
+def get_ingredients():
+    conn = get_db()
+    ingredients = conn.execute("SELECT * FROM fertiliser_ingredients ORDER BY name").fetchall()
+    conn.close()
+    return ingredients
 
 
 def get_dashboard_data():
@@ -196,6 +248,51 @@ def get_dashboard_data():
 
     conn.close()
     return results
+
+
+def calculate_mix(target_n, target_p, target_k, batch_size, ing_n, ing_p, ing_k):
+    try:
+        a = (ing_n["n_pct"] or 0) / 100.0
+        b = (ing_p["p_pct"] or 0) / 100.0
+        c = (ing_k["k_pct"] or 0) / 100.0
+
+        if a <= 0 or b <= 0 or c <= 0:
+            return None, "One of the selected ingredients has 0% listed for its intended nutrient role. Choose a different ingredient for that role, or check the percentage entered."
+
+        terms = (target_n / a) + (target_p / b) + (target_k / c)
+        if terms <= 0:
+            return None, "Target ratio must contain positive values for N, P and K."
+
+        k_scalar = batch_size / terms
+        w_n = k_scalar * target_n / a
+        w_p = k_scalar * target_p / b
+        w_k = k_scalar * target_k / c
+        total = w_n + w_p + w_k
+
+        result_n = w_n * a
+        result_p = w_p * b
+        result_k = w_k * c
+
+        secondary = {}
+        for field, label in [("ca_pct", "Calcium"), ("mg_pct", "Magnesium"), ("s_pct", "Sulfur")]:
+            total_secondary = 0.0
+            for ing, w in [(ing_n, w_n), (ing_p, w_p), (ing_k, w_k)]:
+                pct = ing[field] or 0
+                total_secondary += w * (pct / 100.0)
+            secondary[label] = round(total_secondary, 1)
+
+        return {
+            "w_n": round(w_n, 1),
+            "w_p": round(w_p, 1),
+            "w_k": round(w_k, 1),
+            "total": round(total, 1),
+            "result_n_pct": round((result_n / total * 100), 2) if total else 0,
+            "result_p_pct": round((result_p / total * 100), 2) if total else 0,
+            "result_k_pct": round((result_k / total * 100), 2) if total else 0,
+            "secondary": secondary,
+        }, None
+    except ZeroDivisionError:
+        return None, "Calculation error, check the ingredient percentages entered."
 
 
 @app.route("/")
@@ -330,16 +427,20 @@ def catalog_edit(catalog_id):
     conn = get_db()
 
     if request.method == "POST":
-        values = [request.form.get(f, "") for f in CATALOG_FIELDS[1:]]  # skip name, not editable here
+        values = [request.form.get(f, "") for f in CATALOG_FIELDS[1:]]
         freq = request.form.get("feed_frequency_days") or None
+        npk_n = request.form.get("npk_n") or None
+        npk_p = request.form.get("npk_p") or None
+        npk_k = request.form.get("npk_k") or None
 
         conn.execute(
             """
             UPDATE plant_catalog
-            SET npk_ratio=?, dosing_rules=?, seasonal_notes=?, deficiency_guide=?, mulch_notes=?, feed_frequency_days=?
+            SET npk_ratio=?, dosing_rules=?, seasonal_notes=?, deficiency_guide=?, mulch_notes=?,
+                feed_frequency_days=?, npk_n=?, npk_p=?, npk_k=?
             WHERE id=?
             """,
-            (*values, freq, catalog_id),
+            (*values, freq, npk_n, npk_p, npk_k, catalog_id),
         )
         conn.commit()
         conn.close()
@@ -354,20 +455,24 @@ def catalog_edit(catalog_id):
 def catalog_add():
     if request.method == "POST":
         values = [request.form.get(f, "") for f in CATALOG_FIELDS]
-        freq = request.form.get("feed_frequency_days") or None
-        values.append(freq)
+        for f in CATALOG_EXTRA_FIELDS:
+            values.append(request.form.get(f) or None)
         conn = get_db()
         conn.execute(
             """
-            INSERT INTO plant_catalog (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO plant_catalog
+            (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days, npk_n, npk_p, npk_k)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(name) DO UPDATE SET
                 npk_ratio=excluded.npk_ratio,
                 dosing_rules=excluded.dosing_rules,
                 seasonal_notes=excluded.seasonal_notes,
                 deficiency_guide=excluded.deficiency_guide,
                 mulch_notes=excluded.mulch_notes,
-                feed_frequency_days=excluded.feed_frequency_days
+                feed_frequency_days=excluded.feed_frequency_days,
+                npk_n=excluded.npk_n,
+                npk_p=excluded.npk_p,
+                npk_k=excluded.npk_k
             """,
             values,
         )
@@ -397,7 +502,8 @@ def catalog_import():
                 rows = []
                 for row in reader:
                     row_data = {f: (row.get(f, "") or "") for f in CATALOG_FIELDS}
-                    row_data["feed_frequency_days"] = row.get("feed_frequency_days", "") or ""
+                    for extra in CATALOG_EXTRA_FIELDS:
+                        row_data[extra] = row.get(extra, "") or ""
                     rows.append(row_data)
                 if not rows:
                     return render_template("catalog_import.html", error="File contained no rows.", rows=None)
@@ -429,19 +535,23 @@ def catalog_import():
             count = 0
             for row in reader:
                 values = [row.get(f, "") or "" for f in CATALOG_FIELDS]
-                freq = row.get("feed_frequency_days") or None
-                values.append(freq)
+                for extra in CATALOG_EXTRA_FIELDS:
+                    values.append(row.get(extra) or None)
                 conn.execute(
                     """
-                    INSERT INTO plant_catalog (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO plant_catalog
+                    (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days, npk_n, npk_p, npk_k)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(name) DO UPDATE SET
                         npk_ratio=excluded.npk_ratio,
                         dosing_rules=excluded.dosing_rules,
                         seasonal_notes=excluded.seasonal_notes,
                         deficiency_guide=excluded.deficiency_guide,
                         mulch_notes=excluded.mulch_notes,
-                        feed_frequency_days=excluded.feed_frequency_days
+                        feed_frequency_days=excluded.feed_frequency_days,
+                        npk_n=excluded.npk_n,
+                        npk_p=excluded.npk_p,
+                        npk_k=excluded.npk_k
                     """,
                     values,
                 )
@@ -451,6 +561,93 @@ def catalog_import():
             return render_template("catalog_import.html", error=None, rows=None, success=f"Imported {count} plant(s) successfully.")
 
     return render_template("catalog_import.html", error=None, rows=None)
+
+
+@app.route("/ingredients", methods=["GET", "POST"])
+def manage_ingredients():
+    if request.method == "POST":
+        values = [request.form.get(f) for f in INGREDIENT_FIELDS]
+        values = [values[0]] + [v or 0 for v in values[1:]]
+        conn = get_db()
+        conn.execute(
+            """
+            INSERT INTO fertiliser_ingredients (name, n_pct, p_pct, k_pct, ca_pct, mg_pct, s_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(name) DO UPDATE SET
+                n_pct=excluded.n_pct, p_pct=excluded.p_pct, k_pct=excluded.k_pct,
+                ca_pct=excluded.ca_pct, mg_pct=excluded.mg_pct, s_pct=excluded.s_pct
+            """,
+            values,
+        )
+        conn.commit()
+        conn.close()
+        return redirect(url_for("manage_ingredients"))
+
+    return render_template("ingredients.html", ingredients=get_ingredients())
+
+
+@app.route("/ingredients/delete/<int:ingredient_id>", methods=["POST"])
+def delete_ingredient(ingredient_id):
+    conn = get_db()
+    conn.execute("DELETE FROM fertiliser_ingredients WHERE id = ?", (ingredient_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("manage_ingredients"))
+
+
+@app.route("/mix", methods=["GET", "POST"])
+def mix_calculator():
+    conn = get_db()
+    plants = conn.execute("""
+        SELECT plants.id, plants.name, plant_catalog.name AS catalog_name,
+               plant_catalog.npk_n, plant_catalog.npk_p, plant_catalog.npk_k
+        FROM plants LEFT JOIN plant_catalog ON plants.catalog_id = plant_catalog.id
+        ORDER BY plants.name
+    """).fetchall()
+    ingredients = conn.execute("SELECT * FROM fertiliser_ingredients ORDER BY name").fetchall()
+    conn.close()
+
+    result = None
+    error = None
+    selected_plant_id = None
+    selected_n_id = None
+    selected_p_id = None
+    selected_k_id = None
+    batch_size = 1000
+
+    if request.method == "POST":
+        selected_plant_id = request.form.get("plant_id")
+        selected_n_id = request.form.get("ingredient_n")
+        selected_p_id = request.form.get("ingredient_p")
+        selected_k_id = request.form.get("ingredient_k")
+        batch_size = float(request.form.get("batch_size") or 1000)
+
+        plant = next((p for p in plants if str(p["id"]) == selected_plant_id), None)
+        ing_n = next((i for i in ingredients if str(i["id"]) == selected_n_id), None)
+        ing_p = next((i for i in ingredients if str(i["id"]) == selected_p_id), None)
+        ing_k = next((i for i in ingredients if str(i["id"]) == selected_k_id), None)
+
+        if not plant or plant["npk_n"] is None or plant["npk_p"] is None or plant["npk_k"] is None:
+            error = "Selected plant has no target NPK ratio set in its catalog entry. Edit the catalog entry to add one."
+        elif not ing_n or not ing_p or not ing_k:
+            error = "Please select an ingredient for each of the N, P and K roles."
+        else:
+            result, error = calculate_mix(
+                plant["npk_n"], plant["npk_p"], plant["npk_k"], batch_size, ing_n, ing_p, ing_k
+            )
+
+    return render_template(
+        "mix.html",
+        plants=plants,
+        ingredients=ingredients,
+        result=result,
+        error=error,
+        selected_plant_id=selected_plant_id,
+        selected_n_id=selected_n_id,
+        selected_p_id=selected_p_id,
+        selected_k_id=selected_k_id,
+        batch_size=batch_size,
+    )
 
 
 if __name__ == "__main__":
