@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Dashboard</h2>
+<table>
+    <tr>
+        <th>Plant</th>
+        <th>Type</th>
+        <th>Last Fed</th>
+        <th>Days Since</th>
+        <th>Frequency</th>
+        <th>Status</th>
+    </tr>
+    {% for d in data %}
+    <tr>
+        <td>{{ d.plant_name }}</td>
+        <td>{{ d.catalog_name if d.catalog_name else '—' }}</td>
+        <td>{{ d.last_feed_date if d.last_feed_date else 'Never logged' }}</td>
+        <td>{{ d.days_since if d.days_since is not none else '—' }}</td>
+        <td>{{ d.frequency_days if d.frequency_days is not none else 'Not set' }} days</td>
+        <td>
+            {% if d.status == 'overdue' %}
+                <strong style="color:#a13d3d;">Overdue</strong>
+            {% elif d.status == 'due_soon' %}
+                <strong style="color:#b8860b;">Due Soon</strong>
+            {% elif d.status == 'ok' %}
+                <span style="color:#2e5339;">OK</span>
+            {% elif d.status == 'never_fed' %}
+                <span style="color:#a13d3d;">Never Fed</span>
+            {% else %}
+                <span>No Schedule Set</span>
+            {% endif %}
+        </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">No plants yet. Go to Manage Plants to add one.</td></tr>
+    {% endfor %}
+</table>
+{% endblock %}
