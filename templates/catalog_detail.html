@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>{{ entry.name }}</h2>
+<p><a href="{{ url_for('catalog_edit', catalog_id=entry.id) }}">Edit this entry</a></p>
 <div class="catalog-card">
     <div class="catalog-section">
         <h4>NPK Ratio & Blend</h4>
