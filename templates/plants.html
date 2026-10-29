@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Manage Plants</h2>
+
+<table style="margin-bottom:25px;">
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+    </tr>
+    {% for p in plants %}
+    <tr>
+        <td>{{ p.name }}</td>
+        <td>{{ p.plant_type if p.plant_type else '' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="2">No plants yet.</td></tr>
+    {% endfor %}
+</table>
+
+<form method="POST">
+    <label for="name">Plant Name</label>
+    <input type="text" id="name" name="name" placeholder="e.g. Banana Clump, Tomato Bed" required>
+
+    <label for="plant_type">Type (optional)</label>
+    <input type="text" id="plant_type" name="plant_type" placeholder="e.g. Banana, Tomato, Citrus">
+
+    <button type="submit">Add Plant</button>
+</form>
+{% endblock %}
