@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Add Catalog Entry</h2>
+<form method="POST">
+    <label for="name">Plant Name</label>
+    <input type="text" id="name" name="name" placeholder="e.g. Tomato" required>
+
+    <label for="npk_ratio">NPK Ratio & Blend</label>
+    <textarea id="npk_ratio" name="npk_ratio" rows="4"></textarea>
+
+    <label for="dosing_rules">Dosing Rules</label>
+    <textarea id="dosing_rules" name="dosing_rules" rows="4"></textarea>
+
+    <label for="seasonal_notes">Seasonal Schedule</label>
+    <textarea id="seasonal_notes" name="seasonal_notes" rows="4"></textarea>
+
+    <label for="deficiency_guide">Deficiency Guide</label>
+    <textarea id="deficiency_guide" name="deficiency_guide" rows="4"></textarea>
+
+    <label for="mulch_notes">Mulching Notes</label>
+    <textarea id="mulch_notes" name="mulch_notes" rows="4"></textarea>
+
+    <button type="submit">Save Catalog Entry</button>
+</form>
+<p><a href="{{ url_for('catalog_list') }}">← Back to Catalog</a></p>
+{% endblock %}
