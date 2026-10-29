@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Add Log Entry</h2>
+<form method="POST">
+    <label for="entry_date">Date</label>
+    <input type="date" id="entry_date" name="entry_date" value="{{ today }}" required>
+
+    <label for="action_type">Action Type</label>
+    <select id="action_type" name="action_type" required>
+        {% for a in action_types %}
+        <option value="{{ a }}">{{ a }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="quantity">Quantity</label>
+    <input type="number" step="0.1" id="quantity" name="quantity">
+
+    <label for="unit">Unit</label>
+    <select id="unit" name="unit">
+        <option value=""></option>
+        {% for u in units %}
+        <option value="{{ u }}">{{ u }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="soil_ph">Soil pH (optional)</label>
+    <input type="number" step="0.1" id="soil_ph" name="soil_ph">
+
+    <label for="notes">Notes / Plant Response</label>
+    <textarea id="notes" name="notes" rows="4"></textarea>
+
+    <button type="submit">Save Entry</button>
+</form>
+{% endblock %}
