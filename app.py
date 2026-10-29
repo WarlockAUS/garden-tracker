@@ -100,7 +100,6 @@ def init_db():
         ).fetchone()[0]
     else:
         banana_catalog_id = existing["id"]
-        # Backfill frequency if it was never set on an existing row
         conn.execute(
             "UPDATE plant_catalog SET feed_frequency_days = ? WHERE id = ? AND feed_frequency_days IS NULL",
             (BANANA_CATALOG_ENTRY["feed_frequency_days"], banana_catalog_id),
@@ -324,6 +323,31 @@ def catalog_detail(catalog_id):
     entry = conn.execute("SELECT * FROM plant_catalog WHERE id = ?", (catalog_id,)).fetchone()
     conn.close()
     return render_template("catalog_detail.html", entry=entry)
+
+
+@app.route("/catalog/edit/<int:catalog_id>", methods=["GET", "POST"])
+def catalog_edit(catalog_id):
+    conn = get_db()
+
+    if request.method == "POST":
+        values = [request.form.get(f, "") for f in CATALOG_FIELDS[1:]]  # skip name, not editable here
+        freq = request.form.get("feed_frequency_days") or None
+
+        conn.execute(
+            """
+            UPDATE plant_catalog
+            SET npk_ratio=?, dosing_rules=?, seasonal_notes=?, deficiency_guide=?, mulch_notes=?, feed_frequency_days=?
+            WHERE id=?
+            """,
+            (*values, freq, catalog_id),
+        )
+        conn.commit()
+        conn.close()
+        return redirect(url_for("catalog_detail", catalog_id=catalog_id))
+
+    entry = conn.execute("SELECT * FROM plant_catalog WHERE id = ?", (catalog_id,)).fetchone()
+    conn.close()
+    return render_template("catalog_edit.html", entry=entry)
 
 
 @app.route("/catalog/add", methods=["GET", "POST"])
