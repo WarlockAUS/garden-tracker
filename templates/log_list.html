@@ -1,9 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Log History</h2>
+
+<form method="GET" class="filter-bar">
+    <label style="display:inline;">Filter by plant:
+        <select name="plant_id" onchange="this.form.submit()">
+            <option value="">All Plants</option>
+            {% for p in plants %}
+            <option value="{{ p.id }}" {% if selected_plant and selected_plant|int == p.id %}selected{% endif %}>{{ p.name }}</option>
+            {% endfor %}
+        </select>
+    </label>
+</form>
+
 <table>
     <tr>
         <th>Date</th>
+        <th>Plant</th>
         <th>Action</th>
         <th>Quantity</th>
         <th>Unit</th>
@@ -14,6 +27,7 @@
     {% for e in entries %}
     <tr>
         <td>{{ e.entry_date }}</td>
+        <td>{{ e.plant_name if e.plant_name else '—' }}</td>
         <td>{{ e.action_type }}</td>
         <td>{{ e.quantity if e.quantity is not none else '' }}</td>
         <td>{{ e.unit if e.unit else '' }}</td>
@@ -26,7 +40,7 @@
         </td>
     </tr>
     {% else %}
-    <tr><td colspan="7">No entries yet. Click "Add Entry" above to log your first one.</td></tr>
+    <tr><td colspan="8">No entries yet. Click "Add Entry" above to log your first one.</td></tr>
     {% endfor %}
 </table>
 {% endblock %}
