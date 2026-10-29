@@ -8,7 +8,14 @@
     <label for="feed_frequency_days">Feed Frequency (days)</label>
     <input type="number" id="feed_frequency_days" name="feed_frequency_days" placeholder="e.g. 42">
 
-    <label for="npk_ratio">NPK Ratio & Blend</label>
+    <label>Target NPK Ratio</label>
+    <div style="display:flex; gap:8px;">
+        <input type="number" step="0.1" name="npk_n" placeholder="N (e.g. 3)">
+        <input type="number" step="0.1" name="npk_p" placeholder="P (e.g. 1)">
+        <input type="number" step="0.1" name="npk_k" placeholder="K (e.g. 6)">
+    </div>
+
+    <label for="npk_ratio">NPK Ratio & Blend (reference text)</label>
     <textarea id="npk_ratio" name="npk_ratio" rows="4"></textarea>
 
     <label for="dosing_rules">Dosing Rules</label>
@@ -25,5 +32,4 @@
 
     <button type="submit">Save Catalog Entry</button>
 </form>
-<p><a href="{{ url_for('catalog_list') }}">← Back to Catalog</a></p>
 {% endblock %}
