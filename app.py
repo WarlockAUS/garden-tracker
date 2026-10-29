@@ -2,7 +2,7 @@ import sqlite3
 import os
 import csv
 import io
-from datetime import date
+from datetime import date, datetime
 from flask import Flask, render_template, request, redirect, url_for
 
 app = Flask(__name__)
@@ -18,6 +18,7 @@ ACTION_TYPES = [
 UNITS = ["grams", "handfuls", "litres", "barrow loads"]
 
 CATALOG_FIELDS = ["name", "npk_ratio", "dosing_rules", "seasonal_notes", "deficiency_guide", "mulch_notes"]
+CATALOG_FIELDS_WITH_FREQ = CATALOG_FIELDS + ["feed_frequency_days"]
 
 BANANA_CATALOG_ENTRY = {
     "name": "Banana",
@@ -26,6 +27,7 @@ BANANA_CATALOG_ENTRY = {
     "seasonal_notes": "Spring-Summer: feed every 4-6 weeks, 50g.\nAutumn: taper to 30-50g.\nWinter: pause feeding unless still actively growing. Soil test before applying dolomite.\nSpring: resume full feeding 2-3 weeks clear of any winter dolomite.",
     "deficiency_guide": "Yellowing between veins, veins stay green: Magnesium deficiency.\nGeneral pale yellowing, slow growth: Nitrogen deficiency.\nDark green leaves, weak stems, poor bunch fill: Potassium deficiency.\nBrown scorched leaf margins, wilting: Over-fertilising.\nPurplish/reddish leaf tinge: Phosphorus deficiency.",
     "mulch_notes": "Depth: approx 10cm organic mulch. Keep clear of stems.\nSequence: pull mulch back, apply fertiliser, water in, replace mulch.\nTop up every 2-3 months.\nSucker thinning: keep main stem plus 1-2 followers, remove extras while small.",
+    "feed_frequency_days": 42,
 }
 
 
@@ -81,19 +83,28 @@ def init_db():
     if "plant_id" not in log_columns:
         conn.execute("ALTER TABLE log_entries ADD COLUMN plant_id INTEGER")
 
+    catalog_columns = [row[1] for row in conn.execute("PRAGMA table_info(plant_catalog)")]
+    if "feed_frequency_days" not in catalog_columns:
+        conn.execute("ALTER TABLE plant_catalog ADD COLUMN feed_frequency_days INTEGER")
+
     existing = conn.execute(
         "SELECT id FROM plant_catalog WHERE name = ?", (BANANA_CATALOG_ENTRY["name"],)
     ).fetchone()
     if not existing:
         conn.execute(
-            "INSERT INTO plant_catalog (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes) VALUES (?, ?, ?, ?, ?, ?)",
-            tuple(BANANA_CATALOG_ENTRY[f] for f in CATALOG_FIELDS),
+            "INSERT INTO plant_catalog (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            tuple(BANANA_CATALOG_ENTRY[f] for f in CATALOG_FIELDS_WITH_FREQ),
         )
         banana_catalog_id = conn.execute(
             "SELECT id FROM plant_catalog WHERE name = ?", (BANANA_CATALOG_ENTRY["name"],)
         ).fetchone()[0]
     else:
         banana_catalog_id = existing["id"]
+        # Backfill frequency if it was never set on an existing row
+        conn.execute(
+            "UPDATE plant_catalog SET feed_frequency_days = ? WHERE id = ? AND feed_frequency_days IS NULL",
+            (BANANA_CATALOG_ENTRY["feed_frequency_days"], banana_catalog_id),
+        )
 
     count = conn.execute("SELECT COUNT(*) FROM plants").fetchone()[0]
     if count == 0:
@@ -129,23 +140,97 @@ def get_catalog():
     return catalog
 
 
+def get_dashboard_data():
+    conn = get_db()
+    plants = conn.execute("""
+        SELECT plants.id, plants.name, plant_catalog.name AS catalog_name,
+               plant_catalog.feed_frequency_days
+        FROM plants LEFT JOIN plant_catalog ON plants.catalog_id = plant_catalog.id
+        ORDER BY plants.name
+    """).fetchall()
+
+    results = []
+    today = date.today()
+
+    for p in plants:
+        last_feed = conn.execute(
+            """
+            SELECT entry_date FROM log_entries
+            WHERE plant_id = ? AND action_type = 'Feed'
+            ORDER BY entry_date DESC LIMIT 1
+            """,
+            (p["id"],),
+        ).fetchone()
+
+        status = "unknown"
+        days_since = None
+        last_feed_date = None
+
+        if last_feed:
+            last_feed_date = last_feed["entry_date"]
+            try:
+                parsed = datetime.strptime(last_feed_date, "%Y-%m-%d").date()
+                days_since = (today - parsed).days
+            except ValueError:
+                days_since = None
+
+        if p["feed_frequency_days"] is None:
+            status = "no_schedule"
+        elif days_since is None:
+            status = "never_fed"
+        elif days_since > p["feed_frequency_days"]:
+            status = "overdue"
+        elif days_since >= (p["feed_frequency_days"] - 7):
+            status = "due_soon"
+        else:
+            status = "ok"
+
+        results.append({
+            "plant_id": p["id"],
+            "plant_name": p["name"],
+            "catalog_name": p["catalog_name"],
+            "frequency_days": p["feed_frequency_days"],
+            "last_feed_date": last_feed_date,
+            "days_since": days_since,
+            "status": status,
+        })
+
+    conn.close()
+    return results
+
+
 @app.route("/")
+def dashboard():
+    data = get_dashboard_data()
+    return render_template("dashboard.html", data=data)
+
+
+@app.route("/log")
 def log_list():
     plant_filter = request.args.get("plant_id", "")
+    action_filter = request.args.get("action_type", "")
     conn = get_db()
     query = """
         SELECT log_entries.*, plants.name AS plant_name
         FROM log_entries LEFT JOIN plants ON log_entries.plant_id = plants.id
+        WHERE 1=1
     """
     params = []
     if plant_filter:
-        query += " WHERE log_entries.plant_id = ?"
+        query += " AND log_entries.plant_id = ?"
         params.append(plant_filter)
+    if action_filter:
+        query += " AND log_entries.action_type = ?"
+        params.append(action_filter)
     query += " ORDER BY entry_date DESC, log_entries.id DESC"
     entries = conn.execute(query, params).fetchall()
     plants = conn.execute("SELECT * FROM plants ORDER BY name").fetchall()
     conn.close()
-    return render_template("log_list.html", entries=entries, plants=plants, selected_plant=plant_filter)
+    return render_template(
+        "log_list.html", entries=entries, plants=plants,
+        selected_plant=plant_filter, selected_action=action_filter,
+        action_types=ACTION_TYPES,
+    )
 
 
 @app.route("/add", methods=["GET", "POST"])
@@ -169,6 +254,39 @@ def add_entry():
         return redirect(url_for("log_list"))
 
     return render_template("log_form.html", action_types=ACTION_TYPES, units=UNITS, today=str(date.today()), plants=get_plants())
+
+
+@app.route("/edit/<int:entry_id>", methods=["GET", "POST"])
+def edit_entry(entry_id):
+    conn = get_db()
+    if request.method == "POST":
+        entry_date = request.form.get("entry_date")
+        action_type = request.form.get("action_type")
+        quantity = request.form.get("quantity") or None
+        unit = request.form.get("unit") or None
+        soil_ph = request.form.get("soil_ph") or None
+        notes = request.form.get("notes") or ""
+        plant_id = request.form.get("plant_id") or None
+
+        conn.execute(
+            """
+            UPDATE log_entries
+            SET entry_date=?, action_type=?, quantity=?, unit=?, soil_ph=?, notes=?, plant_id=?
+            WHERE id=?
+            """,
+            (entry_date, action_type, quantity, unit, soil_ph, notes, plant_id, entry_id),
+        )
+        conn.commit()
+        conn.close()
+        return redirect(url_for("log_list"))
+
+    entry = conn.execute("SELECT * FROM log_entries WHERE id = ?", (entry_id,)).fetchone()
+    plants = get_plants()
+    conn.close()
+    return render_template(
+        "log_form.html", action_types=ACTION_TYPES, units=UNITS,
+        today=str(date.today()), plants=plants, entry=entry, edit_mode=True,
+    )
 
 
 @app.route("/delete/<int:entry_id>", methods=["POST"])
@@ -212,17 +330,20 @@ def catalog_detail(catalog_id):
 def catalog_add():
     if request.method == "POST":
         values = [request.form.get(f, "") for f in CATALOG_FIELDS]
+        freq = request.form.get("feed_frequency_days") or None
+        values.append(freq)
         conn = get_db()
         conn.execute(
             """
-            INSERT INTO plant_catalog (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO plant_catalog (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(name) DO UPDATE SET
                 npk_ratio=excluded.npk_ratio,
                 dosing_rules=excluded.dosing_rules,
                 seasonal_notes=excluded.seasonal_notes,
                 deficiency_guide=excluded.deficiency_guide,
-                mulch_notes=excluded.mulch_notes
+                mulch_notes=excluded.mulch_notes,
+                feed_frequency_days=excluded.feed_frequency_days
             """,
             values,
         )
@@ -245,14 +366,15 @@ def catalog_import():
             try:
                 text = file.read().decode("utf-8-sig")
 
-                # Auto-detect delimiter (comma or tab) rather than assuming comma
                 first_line = text.splitlines()[0] if text.splitlines() else ""
                 delimiter = "\t" if first_line.count("\t") > first_line.count(",") else ","
 
                 reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
                 rows = []
                 for row in reader:
-                    rows.append({f: (row.get(f, "") or "") for f in CATALOG_FIELDS})
+                    row_data = {f: (row.get(f, "") or "") for f in CATALOG_FIELDS}
+                    row_data["feed_frequency_days"] = row.get("feed_frequency_days", "") or ""
+                    rows.append(row_data)
                 if not rows:
                     return render_template("catalog_import.html", error="File contained no rows.", rows=None)
                 missing_cols = [f for f in CATALOG_FIELDS if f not in (reader.fieldnames or [])]
@@ -265,9 +387,8 @@ def catalog_import():
                         rows=None,
                     )
 
-                # Normalise to comma-delimited for the confirm step, regardless of original delimiter
                 output = io.StringIO()
-                writer = csv.DictWriter(output, fieldnames=CATALOG_FIELDS)
+                writer = csv.DictWriter(output, fieldnames=CATALOG_FIELDS_WITH_FREQ)
                 writer.writeheader()
                 for row in rows:
                     writer.writerow(row)
@@ -284,16 +405,19 @@ def catalog_import():
             count = 0
             for row in reader:
                 values = [row.get(f, "") or "" for f in CATALOG_FIELDS]
+                freq = row.get("feed_frequency_days") or None
+                values.append(freq)
                 conn.execute(
                     """
-                    INSERT INTO plant_catalog (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO plant_catalog (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(name) DO UPDATE SET
                         npk_ratio=excluded.npk_ratio,
                         dosing_rules=excluded.dosing_rules,
                         seasonal_notes=excluded.seasonal_notes,
                         deficiency_guide=excluded.deficiency_guide,
-                        mulch_notes=excluded.mulch_notes
+                        mulch_notes=excluded.mulch_notes,
+                        feed_frequency_days=excluded.feed_frequency_days
                     """,
                     values,
                 )
