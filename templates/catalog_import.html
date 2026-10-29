@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Import Catalog from CSV</h2>
+
+<p>CSV must contain these column headers exactly: <code>name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes</code></p>
+<p>Existing plants with a matching name will be updated. New names will be added.</p>
+
+{% if error %}
+<p style="color:#a13d3d; font-weight:bold;">{{ error }}</p>
+{% endif %}
+
+{% if success %}
+<p style="color:#2e5339; font-weight:bold;">{{ success }}</p>
+{% endif %}
+
+{% if not rows %}
+<form method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="action" value="preview">
+    <label for="csv_file">Choose CSV file</label>
+    <input type="file" id="csv_file" name="csv_file" accept=".csv" required>
+    <button type="submit">Preview Import</button>
+</form>
+{% endif %}
+
+{% if rows %}
+<h3>Preview ({{ rows|length }} row(s) found)</h3>
+<table>
+    <tr>
+        <th>Name</th>
+        <th>NPK Ratio</th>
+        <th>Dosing Rules</th>
+    </tr>
+    {% for r in rows %}
+    <tr>
+        <td>{{ r.name }}</td>
+        <td>{{ r.npk_ratio[:60] }}{% if r.npk_ratio|length > 60 %}...{% endif %}</td>
+        <td>{{ r.dosing_rules[:60] }}{% if r.dosing_rules|length > 60 %}...{% endif %}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<form method="POST" style="margin-top:15px;">
+    <input type="hidden" name="action" value="confirm">
+    <input type="hidden" name="raw_csv" value="{{ raw_csv }}">
+    <button type="submit">Confirm Import</button>
+</form>
+{% endif %}
+
+<p><a href="{{ url_for('catalog_list') }}">← Back to Catalog</a></p>
+{% endblock %}
