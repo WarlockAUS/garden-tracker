@@ -2,6 +2,12 @@
 {% block content %}
 <h2>Plant Catalog</h2>
 <p>Reference guide for each plant type: feeding ratios, dosing rules, seasonal schedule, and deficiency guide.</p>
+
+<p>
+    <a href="{{ url_for('catalog_add') }}"><button type="button">+ Add Plant Manually</button></a>
+    <a href="{{ url_for('catalog_import') }}"><button type="button">⇧ Import from CSV</button></a>
+</p>
+
 <table>
     <tr>
         <th>Plant Type</th>
