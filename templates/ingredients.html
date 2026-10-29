@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Fertiliser Ingredients</h2>
+<p>Enter the percentages exactly as shown on the product packet. Leave a field as 0 if that nutrient isn't listed.</p>
+
+<table style="margin-bottom:25px;">
+    <tr>
+        <th>Name</th><th>N%</th><th>P%</th><th>K%</th><th>Ca%</th><th>Mg%</th><th>S%</th><th></th>
+    </tr>
+    {% for i in ingredients %}
+    <tr>
+        <td>{{ i.name }}</td>
+        <td>{{ i.n_pct }}</td>
+        <td>{{ i.p_pct }}</td>
+        <td>{{ i.k_pct }}</td>
+        <td>{{ i.ca_pct }}</td>
+        <td>{{ i.mg_pct }}</td>
+        <td>{{ i.s_pct }}</td>
+        <td>
+            <form method="POST" action="{{ url_for('delete_ingredient', ingredient_id=i.id) }}" style="margin:0; padding:0; background:none;">
+                <button type="submit" class="delete-btn" onclick="return confirm('Delete this ingredient?');">Delete</button>
+            </form>
+        </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">No ingredients yet.</td></tr>
+    {% endfor %}
+</table>
+
+<form method="POST">
+    <label for="name">Product Name</label>
+    <input type="text" id="name" name="name" placeholder="e.g. Sulphate of Ammonia" required>
+
+    <label for="n_pct">Nitrogen (N) %</label>
+    <input type="number" step="0.1" id="n_pct" name="n_pct" placeholder="0">
+
+    <label for="p_pct">Phosphorus (P2O5) %</label>
+    <input type="number" step="0.1" id="p_pct" name="p_pct" placeholder="0">
+
+    <label for="k_pct">Potassium (K2O) %</label>
+    <input type="number" step="0.1" id="k_pct" name="k_pct" placeholder="0">
+
+    <label for="ca_pct">Calcium (Ca) % (optional)</label>
+    <input type="number" step="0.1" id="ca_pct" name="ca_pct" placeholder="0">
+
+    <label for="mg_pct">Magnesium (Mg) % (optional)</label>
+    <input type="number" step="0.1" id="mg_pct" name="mg_pct" placeholder="0">
+
+    <label for="s_pct">Sulfur (S) % (optional)</label>
+    <input type="number" step="0.1" id="s_pct" name="s_pct" placeholder="0">
+
+    <button type="submit">Save Ingredient</button>
+</form>
+{% endblock %}
