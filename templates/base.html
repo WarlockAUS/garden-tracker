@@ -21,6 +21,9 @@
         .delete-btn:hover { background: #7e2f2f; }
         .filter-bar { margin-bottom: 15px; background: white; padding: 10px 15px; border-radius: 6px; display: inline-block; }
         .filter-bar select { display: inline; width: auto; margin-left: 8px; }
+        .catalog-card { background: white; padding: 15px; border-radius: 6px; margin-bottom: 15px; }
+        .catalog-section { white-space: pre-line; margin-bottom: 15px; line-height: 1.5; }
+        .catalog-section h4 { margin-bottom: 4px; color: #2e5339; }
     </style>
 </head>
 <body>
@@ -29,6 +32,7 @@
         <a href="{{ url_for('log_list') }}">View Log</a>
         <a href="{{ url_for('add_entry') }}">Add Entry</a>
         <a href="{{ url_for('manage_plants') }}">Manage Plants</a>
+        <a href="{{ url_for('catalog_list') }}">Plant Catalog</a>
     </nav>
     {% block content %}{% endblock %}
 </body>
