@@ -244,21 +244,36 @@ def catalog_import():
                 return render_template("catalog_import.html", error="No file selected.", rows=None)
             try:
                 text = file.read().decode("utf-8-sig")
-                reader = csv.DictReader(io.StringIO(text))
+
+                # Auto-detect delimiter (comma or tab) rather than assuming comma
+                first_line = text.splitlines()[0] if text.splitlines() else ""
+                delimiter = "\t" if first_line.count("\t") > first_line.count(",") else ","
+
+                reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
                 rows = []
                 for row in reader:
                     rows.append({f: (row.get(f, "") or "") for f in CATALOG_FIELDS})
                 if not rows:
                     return render_template("catalog_import.html", error="File contained no rows.", rows=None)
-                missing_cols = [f for f in CATALOG_FIELDS if f not in reader.fieldnames]
+                missing_cols = [f for f in CATALOG_FIELDS if f not in (reader.fieldnames or [])]
                 if missing_cols:
+                    detected = "tab" if delimiter == "\t" else "comma"
+                    found_cols = ", ".join(reader.fieldnames or [])
                     return render_template(
                         "catalog_import.html",
-                        error=f"CSV is missing required columns: {', '.join(missing_cols)}",
+                        error=f"CSV is missing required columns: {', '.join(missing_cols)}. Detected delimiter: {detected}. Found columns: {found_cols}",
                         rows=None,
                     )
-                # Pass raw CSV text through as a hidden field for the confirm step
-                return render_template("catalog_import.html", error=None, rows=rows, raw_csv=text)
+
+                # Normalise to comma-delimited for the confirm step, regardless of original delimiter
+                output = io.StringIO()
+                writer = csv.DictWriter(output, fieldnames=CATALOG_FIELDS)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow(row)
+                normalised_csv = output.getvalue()
+
+                return render_template("catalog_import.html", error=None, rows=rows, raw_csv=normalised_csv)
             except Exception as e:
                 return render_template("catalog_import.html", error=f"Could not read file: {e}", rows=None)
 
