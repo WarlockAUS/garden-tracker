@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ entry.name }}</h2>
+<div class="catalog-card">
+    <div class="catalog-section">
+        <h4>NPK Ratio & Blend</h4>
+        {{ entry.npk_ratio }}
+    </div>
+    <div class="catalog-section">
+        <h4>Dosing Rules</h4>
+        {{ entry.dosing_rules }}
+    </div>
+    <div class="catalog-section">
+        <h4>Seasonal Schedule</h4>
+        {{ entry.seasonal_notes }}
+    </div>
+    <div class="catalog-section">
+        <h4>Deficiency Guide</h4>
+        {{ entry.deficiency_guide }}
+    </div>
+    <div class="catalog-section">
+        <h4>Mulching Notes</h4>
+        {{ entry.mulch_notes }}
+    </div>
+</div>
+<p><a href="{{ url_for('catalog_list') }}">← Back to Catalog</a></p>
+{% endblock %}
