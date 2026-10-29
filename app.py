@@ -31,6 +31,17 @@ def get_db():
 
 def init_db():
     conn = get_db()
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS plants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            plant_type TEXT
+        )
+        """
+    )
+
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS log_entries (
@@ -44,18 +55,53 @@ def init_db():
         )
         """
     )
+
+    # Migration: add plant_id column to log_entries if it doesn't already exist
+    existing_columns = [row[1] for row in conn.execute("PRAGMA table_info(log_entries)")]
+    if "plant_id" not in existing_columns:
+        conn.execute("ALTER TABLE log_entries ADD COLUMN plant_id INTEGER")
+
+    # Seed a default plant if none exist yet, so old entries have somewhere to point
+    count = conn.execute("SELECT COUNT(*) FROM plants").fetchone()[0]
+    if count == 0:
+        conn.execute(
+            "INSERT INTO plants (name, plant_type) VALUES (?, ?)",
+            ("Banana Clump", "Banana"),
+        )
+
     conn.commit()
     conn.close()
 
 
+def get_plants():
+    conn = get_db()
+    plants = conn.execute("SELECT * FROM plants ORDER BY name").fetchall()
+    conn.close()
+    return plants
+
+
 @app.route("/")
 def log_list():
+    plant_filter = request.args.get("plant_id", "")
     conn = get_db()
-    entries = conn.execute(
-        "SELECT * FROM log_entries ORDER BY entry_date DESC, id DESC"
-    ).fetchall()
+
+    query = """
+        SELECT log_entries.*, plants.name AS plant_name
+        FROM log_entries
+        LEFT JOIN plants ON log_entries.plant_id = plants.id
+    """
+    params = []
+    if plant_filter:
+        query += " WHERE log_entries.plant_id = ?"
+        params.append(plant_filter)
+    query += " ORDER BY entry_date DESC, log_entries.id DESC"
+
+    entries = conn.execute(query, params).fetchall()
+    plants = conn.execute("SELECT * FROM plants ORDER BY name").fetchall()
     conn.close()
-    return render_template("log_list.html", entries=entries)
+    return render_template(
+        "log_list.html", entries=entries, plants=plants, selected_plant=plant_filter
+    )
 
 
 @app.route("/add", methods=["GET", "POST"])
@@ -67,14 +113,15 @@ def add_entry():
         unit = request.form.get("unit") or None
         soil_ph = request.form.get("soil_ph") or None
         notes = request.form.get("notes") or ""
+        plant_id = request.form.get("plant_id") or None
 
         conn = get_db()
         conn.execute(
             """
-            INSERT INTO log_entries (entry_date, action_type, quantity, unit, soil_ph, notes)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO log_entries (entry_date, action_type, quantity, unit, soil_ph, notes, plant_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (entry_date, action_type, quantity, unit, soil_ph, notes),
+            (entry_date, action_type, quantity, unit, soil_ph, notes, plant_id),
         )
         conn.commit()
         conn.close()
@@ -85,6 +132,7 @@ def add_entry():
         action_types=ACTION_TYPES,
         units=UNITS,
         today=str(date.today()),
+        plants=get_plants(),
     )
 
 
@@ -95,6 +143,24 @@ def delete_entry(entry_id):
     conn.commit()
     conn.close()
     return redirect(url_for("log_list"))
+
+
+@app.route("/plants", methods=["GET", "POST"])
+def manage_plants():
+    if request.method == "POST":
+        name = request.form.get("name")
+        plant_type = request.form.get("plant_type") or ""
+        if name:
+            conn = get_db()
+            conn.execute(
+                "INSERT INTO plants (name, plant_type) VALUES (?, ?)",
+                (name, plant_type),
+            )
+            conn.commit()
+            conn.close()
+        return redirect(url_for("manage_plants"))
+
+    return render_template("plants.html", plants=get_plants())
 
 
 if __name__ == "__main__":
