@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Planting & Harvest Calendar</h2>
+<p><span class="tag tag-plant">🌱 Plant</span> suitable to plant/sow this month. <span class="tag tag-harvest">🧺 Harvest</span> suitable to harvest this month.</p>
+
+<div class="cal-grid">
+    {% for m in range(1, 13) %}
+    <div class="cal-month {% if m == current_month %}current{% endif %}">
+        <h3>{{ month_names[m-1] }}{% if m == current_month %} (now){% endif %}</h3>
+        {% if data[m].planting %}
+            {% for name in data[m].planting %}
+            <span class="tag tag-plant">🌱 {{ name }}</span>
+            {% endfor %}
+        {% endif %}
+        {% if data[m].harvesting %}
+            {% for name in data[m].harvesting %}
+            <span class="tag tag-harvest">🧺 {{ name }}</span>
+            {% endfor %}
+        {% endif %}
+        {% if not data[m].planting and not data[m].harvesting %}
+        <p style="color:#999; margin:0;">Nothing scheduled</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
