@@ -197,7 +197,8 @@ def init_db():
 def get_plants():
     conn = get_db()
     plants = conn.execute("""
-        SELECT plants.*, plant_catalog.name AS catalog_name
+        SELECT plants.*, plant_catalog.name AS catalog_name,
+               (SELECT COUNT(*) FROM log_entries WHERE log_entries.plant_id = plants.id) AS log_count
         FROM plants LEFT JOIN plant_catalog ON plants.catalog_id = plant_catalog.id
         ORDER BY plants.name
     """).fetchall()
