@@ -1,25 +1,35 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Manage Plants</h2>
+<h2>Manage My Plants</h2>
+
+{% if delete_error %}
+<p style="color:#a13d3d; font-weight:bold;">{{ delete_error }}</p>
+{% endif %}
 
 <table style="margin-bottom:25px;">
     <tr>
         <th>Name</th>
         <th>Catalog Type</th>
+        <th></th>
     </tr>
     {% for p in plants %}
     <tr>
         <td>{{ p.name }}</td>
         <td>{{ p.catalog_name if p.catalog_name else (p.plant_type if p.plant_type else '') }}</td>
+        <td>
+            <form method="POST" action="{{ url_for('delete_plant', plant_id=p.id) }}" style="margin:0; padding:0; background:none;">
+                <button type="submit" class="delete-btn" onclick="return confirm('Delete {{ p.name }}? This only works if it has no log entries.');">Delete</button>
+            </form>
+        </td>
     </tr>
     {% else %}
-    <tr><td colspan="2">No plants yet.</td></tr>
+    <tr><td colspan="3">No plants yet.</td></tr>
     {% endfor %}
 </table>
 
 <form method="POST">
     <label for="name">Plant Name</label>
-    <input type="text" id="name" name="name" placeholder="e.g. Banana Clump, Tomato Bed" required>
+    <input type="text" id="name" name="name" placeholder="e.g. Tomato Bed" required>
 
     <label for="catalog_id">Catalog Type</label>
     <select id="catalog_id" name="catalog_id" required>
