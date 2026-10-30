@@ -281,6 +281,11 @@ def get_dashboard_data():
 def get_calendar_data():
     conn = get_db()
     catalog = conn.execute("SELECT * FROM plant_catalog ORDER BY name").fetchall()
+    owned_ids = set(
+        row["catalog_id"] for row in conn.execute(
+            "SELECT DISTINCT catalog_id FROM plants WHERE catalog_id IS NOT NULL"
+        )
+    )
     conn.close()
 
     months = {m: {"planting": [], "harvesting": []} for m in range(1, 13)}
@@ -291,8 +296,9 @@ def get_calendar_data():
 
         family = entry["plant_family"] or ""
         note = FAMILY_NOTES.get(family, "")
+        is_mine = entry["id"] in owned_ids
 
-        info = {"name": entry["name"], "family": family, "note": note}
+        info = {"name": entry["name"], "family": family, "note": note, "mine": is_mine}
 
         for m in plant_list:
             if m in months:
