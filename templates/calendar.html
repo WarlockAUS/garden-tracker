@@ -1,29 +1,60 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Planting & Harvest Calendar</h2>
-<p><span class="tag tag-plant">🌱 Plant</span> suitable to plant/sow this month. <span class="tag tag-harvest">🧺 Harvest</span> suitable to harvest this month.</p>
+
+<div class="filter-bar">
+    <label style="display:inline; margin-right:10px;">
+        <input type="radio" name="cal_view" value="planting" checked onchange="toggleCalView()" style="width:auto; display:inline;"> Show Planting
+    </label>
+    <label style="display:inline;">
+        <input type="radio" name="cal_view" value="harvest" onchange="toggleCalView()" style="width:auto; display:inline;"> Show Harvest
+    </label>
+</div>
 
 <div class="cal-grid">
     {% for m in range(1, 13) %}
     <div class="cal-month {% if m == current_month %}current{% endif %}">
         <h3>{{ month_names[m-1] }}{% if m == current_month %} (now){% endif %}</h3>
-        {% if data[m].planting %}
-            {% for item in data[m].planting %}
-            <div>
-                <span class="tag tag-plant">🌱 {{ item.name }}{% if item.family %} ({{ item.family }}){% endif %}</span>
-                {% if item.note %}<div style="font-size:11px; color:#777; margin:0 0 6px 4px;">{{ item.note }}</div>{% endif %}
-            </div>
-            {% endfor %}
-        {% endif %}
-        {% if data[m].harvesting %}
-            {% for item in data[m].harvesting %}
-            <span class="tag tag-harvest">🧺 {{ item.name }}</span>
-            {% endfor %}
-        {% endif %}
-        {% if not data[m].planting and not data[m].harvesting %}
-        <p style="color:#999; margin:0;">Nothing scheduled</p>
-        {% endif %}
+
+        <div class="cal-planting-section">
+            {% if data[m].planting %}
+                {% for item in data[m].planting %}
+                <div>
+                    <span class="tag tag-plant">🌱 {{ item.name }}{% if item.family %} ({{ item.family }}){% endif %}</span>
+                    {% if item.note %}<div style="font-size:11px; color:#777; margin:0 0 6px 4px;">{{ item.note }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color:#999; margin:0;">Nothing to plant</p>
+            {% endif %}
+        </div>
+
+        <div class="cal-harvest-section" style="display:none;">
+            {% if data[m].harvesting %}
+                {% for item in data[m].harvesting %}
+                <span class="tag tag-harvest">🧺 {{ item.name }}</span>
+                {% endfor %}
+            {% else %}
+                <p style="color:#999; margin:0;">Nothing to harvest</p>
+            {% endif %}
+        </div>
+
     </div>
     {% endfor %}
 </div>
+
+<script>
+function toggleCalView() {
+    var view = document.querySelector('input[name="cal_view"]:checked').value;
+    var plantingSections = document.querySelectorAll('.cal-planting-section');
+    var harvestSections = document.querySelectorAll('.cal-harvest-section');
+
+    plantingSections.forEach(function(el) {
+        el.style.display = (view === 'planting') ? 'block' : 'none';
+    });
+    harvestSections.forEach(function(el) {
+        el.style.display = (view === 'harvest') ? 'block' : 'none';
+    });
+}
+</script>
 {% endblock %}
