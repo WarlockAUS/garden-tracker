@@ -3,7 +3,7 @@
 <h2>Import Catalog from CSV</h2>
 
 <p>CSV must contain these column headers exactly: <code>name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes</code></p>
-<p>Existing plants with a matching name will be updated. New names will be added.</p>
+<p>Optional additional columns also supported if included: <code>feed_frequency_days, npk_n, npk_p, npk_k, plant_months, harvest_months</code></p>
 
 {% if error %}
 <p style="color:#a13d3d; font-weight:bold;">{{ error }}</p>
