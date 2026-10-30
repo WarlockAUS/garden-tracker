@@ -18,7 +18,7 @@ ACTION_TYPES = [
 UNITS = ["grams", "handfuls", "litres", "barrow loads"]
 
 CATALOG_FIELDS = ["name", "npk_ratio", "dosing_rules", "seasonal_notes", "deficiency_guide", "mulch_notes"]
-CATALOG_EXTRA_FIELDS = ["feed_frequency_days", "npk_n", "npk_p", "npk_k"]
+CATALOG_EXTRA_FIELDS = ["feed_frequency_days", "npk_n", "npk_p", "npk_k", "plant_months", "harvest_months"]
 CATALOG_FIELDS_WITH_FREQ = CATALOG_FIELDS + CATALOG_EXTRA_FIELDS
 
 INGREDIENT_FIELDS = ["name", "n_pct", "p_pct", "k_pct", "ca_pct", "mg_pct", "s_pct"]
@@ -34,6 +34,8 @@ BANANA_CATALOG_ENTRY = {
     "npk_n": 3,
     "npk_p": 1,
     "npk_k": 6,
+    "plant_months": "9,10,11",
+    "harvest_months": "1,2,3,4,5,6,7,8,9,10,11,12",
 }
 
 
@@ -111,6 +113,10 @@ def init_db():
         conn.execute("ALTER TABLE plant_catalog ADD COLUMN npk_p REAL")
     if "npk_k" not in catalog_columns:
         conn.execute("ALTER TABLE plant_catalog ADD COLUMN npk_k REAL")
+    if "plant_months" not in catalog_columns:
+        conn.execute("ALTER TABLE plant_catalog ADD COLUMN plant_months TEXT")
+    if "harvest_months" not in catalog_columns:
+        conn.execute("ALTER TABLE plant_catalog ADD COLUMN harvest_months TEXT")
 
     existing = conn.execute(
         "SELECT id FROM plant_catalog WHERE name = ?", (BANANA_CATALOG_ENTRY["name"],)
@@ -119,8 +125,8 @@ def init_db():
         conn.execute(
             """
             INSERT INTO plant_catalog
-            (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days, npk_n, npk_p, npk_k)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days, npk_n, npk_p, npk_k, plant_months, harvest_months)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             tuple(BANANA_CATALOG_ENTRY[f] for f in CATALOG_FIELDS_WITH_FREQ),
         )
@@ -137,6 +143,10 @@ def init_db():
             "UPDATE plant_catalog SET npk_n=?, npk_p=?, npk_k=? WHERE id=? AND npk_n IS NULL",
             (BANANA_CATALOG_ENTRY["npk_n"], BANANA_CATALOG_ENTRY["npk_p"], BANANA_CATALOG_ENTRY["npk_k"], banana_catalog_id),
         )
+        conn.execute(
+            "UPDATE plant_catalog SET plant_months=?, harvest_months=? WHERE id=? AND plant_months IS NULL",
+            (BANANA_CATALOG_ENTRY["plant_months"], BANANA_CATALOG_ENTRY["harvest_months"], banana_catalog_id),
+        )
 
     count = conn.execute("SELECT COUNT(*) FROM plants").fetchone()[0]
     if count == 0:
@@ -150,7 +160,6 @@ def init_db():
         (banana_catalog_id,),
     )
 
-    # Seed a couple of common ingredients if none exist yet
     ing_count = conn.execute("SELECT COUNT(*) FROM fertiliser_ingredients").fetchone()[0]
     if ing_count == 0:
         conn.executemany(
@@ -250,6 +259,27 @@ def get_dashboard_data():
     return results
 
 
+def get_calendar_data():
+    conn = get_db()
+    catalog = conn.execute("SELECT * FROM plant_catalog ORDER BY name").fetchall()
+    conn.close()
+
+    months = {m: {"planting": [], "harvesting": []} for m in range(1, 13)}
+
+    for entry in catalog:
+        plant_list = [int(x) for x in (entry["plant_months"] or "").split(",") if x.strip().isdigit()]
+        harvest_list = [int(x) for x in (entry["harvest_months"] or "").split(",") if x.strip().isdigit()]
+
+        for m in plant_list:
+            if m in months:
+                months[m]["planting"].append(entry["name"])
+        for m in harvest_list:
+            if m in months:
+                months[m]["harvesting"].append(entry["name"])
+
+    return months
+
+
 def calculate_mix(target_n, target_p, target_k, batch_size, ing_n, ing_p, ing_k):
     try:
         a = (ing_n["n_pct"] or 0) / 100.0
@@ -299,6 +329,17 @@ def calculate_mix(target_n, target_p, target_k, batch_size, ing_n, ing_p, ing_k)
 def dashboard():
     data = get_dashboard_data()
     return render_template("dashboard.html", data=data)
+
+
+@app.route("/calendar")
+def calendar_view():
+    month_names = ["January", "February", "March", "April", "May", "June",
+                   "July", "August", "September", "October", "November", "December"]
+    current_month = date.today().month
+    data = get_calendar_data()
+    return render_template(
+        "calendar.html", data=data, month_names=month_names, current_month=current_month
+    )
 
 
 @app.route("/log")
@@ -432,15 +473,17 @@ def catalog_edit(catalog_id):
         npk_n = request.form.get("npk_n") or None
         npk_p = request.form.get("npk_p") or None
         npk_k = request.form.get("npk_k") or None
+        plant_months = request.form.get("plant_months") or None
+        harvest_months = request.form.get("harvest_months") or None
 
         conn.execute(
             """
             UPDATE plant_catalog
             SET npk_ratio=?, dosing_rules=?, seasonal_notes=?, deficiency_guide=?, mulch_notes=?,
-                feed_frequency_days=?, npk_n=?, npk_p=?, npk_k=?
+                feed_frequency_days=?, npk_n=?, npk_p=?, npk_k=?, plant_months=?, harvest_months=?
             WHERE id=?
             """,
-            (*values, freq, npk_n, npk_p, npk_k, catalog_id),
+            (*values, freq, npk_n, npk_p, npk_k, plant_months, harvest_months, catalog_id),
         )
         conn.commit()
         conn.close()
@@ -461,8 +504,8 @@ def catalog_add():
         conn.execute(
             """
             INSERT INTO plant_catalog
-            (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days, npk_n, npk_p, npk_k)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days, npk_n, npk_p, npk_k, plant_months, harvest_months)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(name) DO UPDATE SET
                 npk_ratio=excluded.npk_ratio,
                 dosing_rules=excluded.dosing_rules,
@@ -472,7 +515,9 @@ def catalog_add():
                 feed_frequency_days=excluded.feed_frequency_days,
                 npk_n=excluded.npk_n,
                 npk_p=excluded.npk_p,
-                npk_k=excluded.npk_k
+                npk_k=excluded.npk_k,
+                plant_months=excluded.plant_months,
+                harvest_months=excluded.harvest_months
             """,
             values,
         )
@@ -540,8 +585,8 @@ def catalog_import():
                 conn.execute(
                     """
                     INSERT INTO plant_catalog
-                    (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days, npk_n, npk_p, npk_k)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (name, npk_ratio, dosing_rules, seasonal_notes, deficiency_guide, mulch_notes, feed_frequency_days, npk_n, npk_p, npk_k, plant_months, harvest_months)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(name) DO UPDATE SET
                         npk_ratio=excluded.npk_ratio,
                         dosing_rules=excluded.dosing_rules,
@@ -551,7 +596,9 @@ def catalog_import():
                         feed_frequency_days=excluded.feed_frequency_days,
                         npk_n=excluded.npk_n,
                         npk_p=excluded.npk_p,
-                        npk_k=excluded.npk_k
+                        npk_k=excluded.npk_k,
+                        plant_months=excluded.plant_months,
+                        harvest_months=excluded.harvest_months
                     """,
                     values,
                 )
