@@ -25,12 +25,20 @@
         .catalog-section { white-space: pre-line; margin-bottom: 15px; line-height: 1.5; }
         .catalog-section h4 { margin-bottom: 4px; color: #2e5339; }
         .result-box { background: white; padding: 20px; border-radius: 6px; max-width: 600px; margin-top: 15px; }
+        .cal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+        .cal-month { background: white; border-radius: 6px; padding: 12px; border: 2px solid transparent; }
+        .cal-month.current { border-color: #2e5339; box-shadow: 0 0 0 2px #cfe3d6; }
+        .cal-month h3 { margin: 0 0 8px 0; color: #2e5339; }
+        .tag { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 12px; margin: 2px 4px 2px 0; }
+        .tag-plant { background: #d9f0e1; color: #1e4a2d; }
+        .tag-harvest { background: #fbe8c6; color: #8a5a00; }
     </style>
 </head>
 <body>
     <h1>🌱 Garden Tracker</h1>
     <nav>
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('calendar_view') }}">Calendar</a>
         <a href="{{ url_for('log_list') }}">View Log</a>
         <a href="{{ url_for('add_entry') }}">Add Entry</a>
         <a href="{{ url_for('manage_plants') }}">Manage Plants</a>
