@@ -477,7 +477,25 @@ def manage_plants():
             conn.close()
         return redirect(url_for("manage_plants"))
 
-    return render_template("plants.html", plants=get_plants(), catalog=get_catalog())
+    delete_error = request.args.get("delete_error")
+    return render_template("plants.html", plants=get_plants(), catalog=get_catalog(), delete_error=delete_error)
+
+
+@app.route("/plants/delete/<int:plant_id>", methods=["POST"])
+def delete_plant(plant_id):
+    conn = get_db()
+    log_count = conn.execute(
+        "SELECT COUNT(*) FROM log_entries WHERE plant_id = ?", (plant_id,)
+    ).fetchone()[0]
+
+    if log_count > 0:
+        conn.close()
+        return redirect(url_for("manage_plants", delete_error=f"Cannot delete: this plant has {log_count} log entries. Delete those first, or view the log to reassign them."))
+
+    conn.execute("DELETE FROM plants WHERE id = ?", (plant_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("manage_plants"))
 
 
 @app.route("/catalog")
