@@ -4,10 +4,13 @@
 
 <div class="filter-bar">
     <label style="display:inline; margin-right:10px;">
-        <input type="radio" name="cal_view" value="planting" checked onchange="toggleCalView()" style="width:auto; display:inline;"> Show Planting
+        <input type="radio" name="cal_view" value="planting" checked onchange="applyFilters()" style="width:auto; display:inline;"> Show Planting
+    </label>
+    <label style="display:inline; margin-right:20px;">
+        <input type="radio" name="cal_view" value="harvest" onchange="applyFilters()" style="width:auto; display:inline;"> Show Harvest
     </label>
     <label style="display:inline;">
-        <input type="radio" name="cal_view" value="harvest" onchange="toggleCalView()" style="width:auto; display:inline;"> Show Harvest
+        <input type="checkbox" id="onlyMineCheckbox" onchange="applyFilters()" style="width:auto; display:inline;"> Only show my plants
     </label>
 </div>
 
@@ -19,7 +22,7 @@
         <div class="cal-planting-section">
             {% if data[m].planting %}
                 {% for item in data[m].planting %}
-                <div>
+                <div class="cal-item" data-mine="{{ 'true' if item.mine else 'false' }}">
                     <span class="tag tag-plant">🌱 {{ item.name }}{% if item.family %} ({{ item.family }}){% endif %}</span>
                     {% if item.note %}<div style="font-size:11px; color:#777; margin:0 0 6px 4px;">{{ item.note }}</div>{% endif %}
                 </div>
@@ -32,7 +35,7 @@
         <div class="cal-harvest-section" style="display:none;">
             {% if data[m].harvesting %}
                 {% for item in data[m].harvesting %}
-                <span class="tag tag-harvest">🧺 {{ item.name }}</span>
+                <span class="tag tag-harvest cal-item" data-mine="{{ 'true' if item.mine else 'false' }}">🧺 {{ item.name }}</span>
                 {% endfor %}
             {% else %}
                 <p style="color:#999; margin:0;">Nothing to harvest</p>
@@ -44,16 +47,20 @@
 </div>
 
 <script>
-function toggleCalView() {
+function applyFilters() {
     var view = document.querySelector('input[name="cal_view"]:checked').value;
-    var plantingSections = document.querySelectorAll('.cal-planting-section');
-    var harvestSections = document.querySelectorAll('.cal-harvest-section');
+    var onlyMine = document.getElementById('onlyMineCheckbox').checked;
 
-    plantingSections.forEach(function(el) {
+    document.querySelectorAll('.cal-planting-section').forEach(function(el) {
         el.style.display = (view === 'planting') ? 'block' : 'none';
     });
-    harvestSections.forEach(function(el) {
+    document.querySelectorAll('.cal-harvest-section').forEach(function(el) {
         el.style.display = (view === 'harvest') ? 'block' : 'none';
+    });
+
+    document.querySelectorAll('.cal-item').forEach(function(el) {
+        var show = !onlyMine || el.dataset.mine === 'true';
+        el.style.display = show ? '' : 'none';
     });
 }
 </script>
