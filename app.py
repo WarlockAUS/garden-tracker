@@ -703,7 +703,7 @@ def mix_calculator():
 
     result = None
     error = None
-    selected_plant_id = None
+    selected_plant_id = request.args.get("plant_id")
     selected_n_id = None
     selected_p_id = None
     selected_k_id = None
