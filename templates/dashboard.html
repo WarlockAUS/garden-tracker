@@ -9,6 +9,7 @@
         <th>Days Since</th>
         <th>Frequency</th>
         <th>Status</th>
+        <th></th>
     </tr>
     {% for d in data %}
     <tr>
@@ -30,9 +31,10 @@
                 <span>No Schedule Set</span>
             {% endif %}
         </td>
+        <td><a href="{{ url_for('mix_calculator', plant_id=d.plant_id) }}">Mix Calculator</a></td>
     </tr>
     {% else %}
-    <tr><td colspan="6">No plants yet. Go to Manage Plants to add one.</td></tr>
+    <tr><td colspan="7">No plants yet. Go to Manage Plants to add one.</td></tr>
     {% endfor %}
 </table>
 {% endblock %}
