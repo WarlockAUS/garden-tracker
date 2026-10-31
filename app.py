@@ -223,7 +223,7 @@ def get_ingredients():
 def get_dashboard_data():
     conn = get_db()
     plants = conn.execute("""
-        SELECT plants.id, plants.name, plant_catalog.name AS catalog_name,
+        SELECT plants.id, plants.name, plant_catalog.id AS catalog_id, plant_catalog.name AS catalog_name,
                plant_catalog.feed_frequency_days
         FROM plants LEFT JOIN plant_catalog ON plants.catalog_id = plant_catalog.id
         ORDER BY plants.name
@@ -268,6 +268,7 @@ def get_dashboard_data():
         results.append({
             "plant_id": p["id"],
             "plant_name": p["name"],
+            "catalog_id": p["catalog_id"],
             "catalog_name": p["catalog_name"],
             "frequency_days": p["feed_frequency_days"],
             "last_feed_date": last_feed_date,
@@ -277,7 +278,6 @@ def get_dashboard_data():
 
     conn.close()
     return results
-
 
 def get_calendar_data():
     conn = get_db()
