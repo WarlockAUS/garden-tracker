@@ -31,7 +31,12 @@
                 <span>No Schedule Set</span>
             {% endif %}
         </td>
-        <td><a href="{{ url_for('mix_calculator', plant_id=d.plant_id) }}">Mix Calculator</a></td>
+        <td>
+            {% if d.catalog_id %}
+            <a href="{{ url_for('catalog_detail', catalog_id=d.catalog_id) }}">Plant Guide</a> |
+            {% endif %}
+            <a href="{{ url_for('mix_calculator', plant_id=d.plant_id) }}">Mix Calculator</a>
+        </td>
     </tr>
     {% else %}
     <tr><td colspan="7">No plants yet. Go to Manage Plants to add one.</td></tr>
