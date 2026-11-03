@@ -366,7 +366,7 @@ def calculate_mix(target_n, target_p, target_k, batch_size, ing_n, ing_p, ing_k)
 @app.route("/")
 def dashboard():
     data = get_dashboard_data()
-    return render_template("dashboard.html", data=data)
+    return render_template("dashboard.html", data=data, app_version=get_app_version())
 
 
 @app.route("/calendar")
