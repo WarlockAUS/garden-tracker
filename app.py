@@ -3,7 +3,7 @@ import os
 import csv
 import io
 from datetime import date, datetime
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, Response
 
 app = Flask(__name__)
 
@@ -278,6 +278,7 @@ def get_dashboard_data():
 
     conn.close()
     return results
+
 
 def get_calendar_data():
     conn = get_db()
@@ -655,6 +656,26 @@ def catalog_import():
             return render_template("catalog_import.html", error=None, rows=None, success=f"Imported {count} plant(s) successfully.")
 
     return render_template("catalog_import.html", error=None, rows=None)
+
+
+@app.route("/catalog/export")
+def catalog_export():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM plant_catalog ORDER BY name").fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    fieldnames = CATALOG_FIELDS_WITH_FREQ
+    writer = csv.DictWriter(output, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({f: row[f] if row[f] is not None else "" for f in fieldnames})
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=plant_catalog_export.csv"}
+    )
 
 
 @app.route("/ingredients", methods=["GET", "POST"])
