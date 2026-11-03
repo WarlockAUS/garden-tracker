@@ -57,7 +57,13 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-
+def get_app_version():
+    try:
+        with open("/app/version.txt") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return "dev"
+        
 def init_db():
     conn = get_db()
 
